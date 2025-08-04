@@ -27,6 +27,8 @@ _ReSharper*/
 *.db3
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 
 # Временные файлы Visual Studio
 .vs/
@@ -35,7 +37,7 @@ TestResults/
 # Локальные настройки запуска
 Properties/launchSettings.json
 
-# Секреты (даже если пока их нет, хорошая привычка)
+# Секреты
 secrets.json
 appsettings.Development.json
 

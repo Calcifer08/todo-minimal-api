@@ -19,7 +19,7 @@ GET {{TodoApi_HostAddress}}/99
 ######################
 
 ### Создать новую задачу (успешно)
-POST  {{TodoApi_HostAddress}}/
+POST {{TodoApi_HostAddress}}/
 Content-Type: application/json
 
 {

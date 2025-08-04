@@ -1,13 +1,20 @@
 using TodoApi.Models;
+using TodoApi.DTOs;
 using TodoApi.Services;
 using TodoApi.Data;
 using Microsoft.EntityFrameworkCore;
+using TodoApi.MappingProfiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
 string? connection = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<TodoDbContext>(options => options.UseSqlite(connection));
 builder.Services.AddScoped<TodoService>();
+builder.Services.AddAutoMapper(mp =>
+{
+    mp.AddProfile<TodoProfile>();
+});
+
 var app = builder.Build();
 
 app.MapGet("/", (TodoService todoService) =>
@@ -27,20 +34,20 @@ app.MapGet("/{id:int}", (int id, TodoService todoService) =>
         return Results.NotFound();
 });
 
-app.MapPost("/", (Todo todo, TodoService todoService) =>
+app.MapPost("/", (TodoDTO todoDTO, TodoService todoService) =>
 {
-    if (todo is null || string.IsNullOrWhiteSpace(todo.Name))
+    if (todoDTO is null || string.IsNullOrWhiteSpace(todoDTO.Name))
     {
         return Results.BadRequest("Неверные данные для задачи.");
     }
 
-    todoService.Create(todo);
+    var todo = todoService.Create(todoDTO);
     return Results.Created($"/{todo.Id}", todo);
 });
 
-app.MapPut("/{id:int}", (int id, Todo inputTodo, TodoService todoService) =>
+app.MapPut("/{id:int}", (int id, TodoDTO newTodoDTO, TodoService todoService) =>
 {
-    if (inputTodo is null || string.IsNullOrWhiteSpace(inputTodo.Name))
+    if (newTodoDTO is null || string.IsNullOrWhiteSpace(newTodoDTO.Name))
     {
         return Results.BadRequest("Неверные данные для задачи.");
     }
@@ -52,7 +59,7 @@ app.MapPut("/{id:int}", (int id, Todo inputTodo, TodoService todoService) =>
         return Results.NotFound();
     }
 
-    todoService.Update(id, inputTodo);
+    todoService.Update(id, newTodoDTO);
     return Results.NoContent();
 });
 
