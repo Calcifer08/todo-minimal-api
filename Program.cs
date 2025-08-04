@@ -4,6 +4,8 @@ using TodoApi.Services;
 using TodoApi.Data;
 using Microsoft.EntityFrameworkCore;
 using TodoApi.MappingProfiles;
+using FluentValidation;
+using TodoApi.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +16,7 @@ builder.Services.AddAutoMapper(mp =>
 {
     mp.AddProfile<TodoProfile>();
 });
+builder.Services.AddScoped<IValidator<TodoDTO>, TodoDtoValidator>();
 
 var app = builder.Build();
 
@@ -34,22 +37,24 @@ app.MapGet("/{id:int}", (int id, TodoService todoService) =>
         return Results.NotFound();
 });
 
-app.MapPost("/", (TodoDTO todoDTO, TodoService todoService) =>
+app.MapPost("/", (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
 {
-    if (todoDTO is null || string.IsNullOrWhiteSpace(todoDTO.Name))
+    var validResult = validator.Validate(todoDTO);
+    if (!validResult.IsValid)
     {
-        return Results.BadRequest("Неверные данные для задачи.");
+        return Results.ValidationProblem(validResult.ToDictionary());
     }
 
     var todo = todoService.Create(todoDTO);
     return Results.Created($"/{todo.Id}", todo);
 });
 
-app.MapPut("/{id:int}", (int id, TodoDTO newTodoDTO, TodoService todoService) =>
+app.MapPut("/{id:int}", (int id, TodoDTO newTodoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
 {
-    if (newTodoDTO is null || string.IsNullOrWhiteSpace(newTodoDTO.Name))
+    var validResult = validator.Validate(newTodoDTO);
+    if (!validResult.IsValid)
     {
-        return Results.BadRequest("Неверные данные для задачи.");
+        return Results.ValidationProblem(validResult.ToDictionary());
     }
 
 
