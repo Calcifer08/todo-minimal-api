@@ -1,57 +1,48 @@
-namespace TodoApi.Services;
-
+using TodoApi.Data;
 using TodoApi.Models;
 
-public static class TodoService
+namespace TodoApi.Services;
+
+public class TodoService
 {
-  private static List<Todo> _todoList;
-  private static int _nextId = 3;
+  private readonly TodoDbContext _dbContext;
 
-  static TodoService()
+  public TodoService(TodoDbContext dbContext)
   {
-    _todoList = new List<Todo>()
-    {
-        new Todo() { Id = 1, Name = "Todo1", IsComplete = false },
-        new Todo() { Id = 2, Name = "Todo2", IsComplete = false },
-    };
+    _dbContext = dbContext;
   }
 
-  public static List<Todo> GetAll() => _todoList;
+  public List<Todo> GetAll() => _dbContext.TodoSet.ToList();
 
-  public static Todo? Get(int id)
+  public Todo? Get(int id)
   {
-    return _todoList.FirstOrDefault(t => t.Id == id);
+    return _dbContext.TodoSet.Find(id);
   }
 
-  public static void Create(Todo todo)
+  public void Create(Todo todo)
   {
-    if (todo is not null)
-    {
-      _nextId++;
-      todo.Id = _nextId;
-      _todoList.Add(todo);
-
-    }
+    _dbContext.Add(todo);
+    _dbContext.SaveChanges();
   }
 
-  public static void Update(int id, Todo newTodo)
+  public void Update(int id, Todo newTodo)
   {
-    var todo = _todoList.FirstOrDefault(t => t.Id == id);
+    var todo = _dbContext.TodoSet.Find(id);
 
-    if (todo is not null)
-    {
-      todo.Name = newTodo.Name;
-      todo.IsComplete = newTodo.IsComplete;
-    }
+    if (todo is null) return;
+
+    todo.Name = newTodo.Name;
+    todo.IsComplete = newTodo.IsComplete;
+    _dbContext.SaveChanges();
   }
 
-  public static void Delete(int id)
+  public void Delete(int id)
   {
     var todo = Get(id);
 
-    if (todo is not null)
-    {
-      _todoList.Remove(todo);
-    }
+    if (todo is null) return;
+
+    _dbContext.Remove(todo);
+    _dbContext.SaveChanges();
   }
 }
