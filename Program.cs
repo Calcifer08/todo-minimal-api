@@ -1,4 +1,3 @@
-using TodoApi.Models;
 using TodoApi.DTOs;
 using TodoApi.Services;
 using TodoApi.Data;
@@ -18,13 +17,18 @@ builder.Services.AddAutoMapper(mp =>
     mp.AddProfile<TodoProfile>();
 });
 builder.Services.AddScoped<IValidator<TodoDTO>, TodoDtoValidator>();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
     app.UseMiddleware<RequestLoggingMiddleware>();
     app.UseDeveloperExceptionPage();
+
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 else
 {
