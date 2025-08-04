@@ -6,6 +6,7 @@ using TodoApi.MappingProfiles;
 using FluentValidation;
 using TodoApi.Validators;
 using TodoApi.Middleware;
+using Microsoft.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,23 @@ builder.Services.AddAutoMapper(mp =>
 builder.Services.AddScoped<IValidator<TodoDTO>, TodoDtoValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Policy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5109", "https://localhost:7261");
+        policy.WithHeaders(HeaderNames.ContentType, HeaderNames.Authorization);
+        policy.WithMethods(
+            HttpMethods.Get,
+            HttpMethods.Post,
+            HttpMethods.Put,
+            HttpMethods.Delete);
+    });
+});
 
 var app = builder.Build();
+
+app.UseCors("Policy");
 
 if (app.Environment.IsDevelopment())
 {
