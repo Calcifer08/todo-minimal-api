@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using TodoApi.MappingProfiles;
 using FluentValidation;
 using TodoApi.Validators;
+using TodoApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,30 @@ builder.Services.AddAutoMapper(mp =>
 builder.Services.AddScoped<IValidator<TodoDTO>, TodoDtoValidator>();
 
 var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseMiddleware<RequestLoggingMiddleware>();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/error");
+}
+
+app.MapGet("/error", (HttpContext context) =>
+{
+    var exceptionHandlerPathFeature =
+        context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+
+    Console.WriteLine($"Ошибка на пути: {exceptionHandlerPathFeature?.Path}");
+    Console.WriteLine($"Сообщение: {exceptionHandlerPathFeature?.Error.Message}");
+
+    return Results.Problem(
+        detail: "Произошла непредвиденная ошибка",
+        statusCode: StatusCodes.Status500InternalServerError
+    );
+});
 
 app.MapGet("/", (TodoService todoService) =>
 {
