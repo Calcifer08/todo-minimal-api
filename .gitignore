@@ -1,0 +1,46 @@
+# Папки с результатами сборки
+[Bb]in/
+[Bb]uild/
+[Oo]bj/
+
+# Сгенерированные NuGet-пакеты
+[Pp]ackages/
+project.lock.json
+*.nupkg
+
+# Локальные пользовательские настройки Visual Studio и Rider
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Локальные файлы ReSharper
+_ReSharper*/
+*.[Rr]esharper
+*.DotSettings.user
+
+# Файлы Visual Studio Code
+.vscode/
+
+# Сгенерированные файлы баз данных
+*.db
+*.db3
+*.sqlite
+*.sqlite3
+
+# Временные файлы Visual Studio
+.vs/
+TestResults/
+
+# Локальные настройки запуска
+Properties/launchSettings.json
+
+# Секреты (даже если пока их нет, хорошая привычка)
+secrets.json
+appsettings.Development.json
+
+# Прочее
+*.log
+*.log.*
+*.DS_Store
+Thumbs.db

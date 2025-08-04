@@ -1,0 +1,66 @@
+@TodoApi_HostAddress = http://localhost:5109
+
+######################
+### GET запросы
+######################
+
+### Получить все задачи
+GET {{TodoApi_HostAddress}}/
+
+### Получить задачу с ID = 1 (успешно)
+GET {{TodoApi_HostAddress}}/1
+Accept: application/json
+
+### Получить задачу с ID = 99 (ошибка)
+GET {{TodoApi_HostAddress}}/99
+
+######################
+### POST запросы
+######################
+
+### Создать новую задачу (успешно)
+POST  {{TodoApi_HostAddress}}/
+Content-Type: application/json
+
+{
+  "name": "Купить молоко",
+  "isComplete": false
+}
+
+### Создать новую задачу (ошибка)
+POST {{TodoApi_HostAddress}}/
+Content-Type: application/json
+
+{
+  "name": "",
+  "isComplete": false
+}
+
+######################
+### PUT запросы
+######################
+
+### Обновить задачу с ID = 1 (успешно)
+PUT {{TodoApi_HostAddress}}/1
+Content-Type: application/json
+
+{
+  "name": "Купить свежий хлеб и молоко",
+  "isComplete": true
+}
+
+### Обновить задачу с ID = 6 (ошибка)
+PUT {{TodoApi_HostAddress}}/6
+Content-Type: application/json
+
+{
+  "name": "",
+  "isComplete": true
+}
+
+######################
+### DELETE запросы
+######################
+
+### Удалить задачу с ID = 2 (успешно)
+DELETE {{TodoApi_HostAddress}}/2
