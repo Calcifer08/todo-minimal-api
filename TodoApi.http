@@ -1,66 +1,110 @@
-@TodoApi_HostAddress = http://localhost:5109
+### ===================================================
+###      ПЕРЕМЕННЫЕ
+### ===================================================
+@HostAddress = http://localhost:5109
 
-######################
-### GET запросы
-######################
+# Переменная для хранения JWT-токена. 
+@jwt_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiJiNzBlNTQ3My02ZTFiLTRlODYtYTc0Zi1jNmViYjk5MmZhZGEiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3NTQ0MzQxNDgsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcyNjEiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MjYxIn0.h-Bo285-RuykvTcgufL3AfYqCx13SZ0XverU9W5ENNs
 
-### Получить все задачи
-GET {{TodoApi_HostAddress}}/
+### ===================================================
+###      АУТЕНТИФИКАЦИЯ (ПУБЛИЧНЫЕ ЭНДПОИНТЫ)
+### ===================================================
 
-### Получить задачу с ID = 1 (успешно)
-GET {{TodoApi_HostAddress}}/1
-Accept: application/json
-
-### Получить задачу с ID = 99 (ошибка)
-GET {{TodoApi_HostAddress}}/99
-
-######################
-### POST запросы
-######################
-
-### Создать новую задачу (успешно)
-POST {{TodoApi_HostAddress}}/
+### 1. Регистрация нового пользователя
+# @name register
+POST {{HostAddress}}/api/auth/register
 Content-Type: application/json
 
 {
-  "name": "Купить молоко",
+  "email": "test@example.com",
+  "password": "Password123"
+}
+
+### ---------------------------------------------------
+
+### 2. Вход в систему для получения токена
+# @name login
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123"
+}
+
+### ---------------------------------------------------
+
+# Этот блок кода автоматически "вытаскивает" токен из ответа на предыдущий запрос "login"
+# и сохраняет его в нашу переменную @jwt_token
+# {{login.response.body.token}} - это специальный синтаксис для этого.
+@{
+    jwt_token = {{login.response.body.token}};
+}
+
+
+
+### ===================================================
+###      ЗАДАЧИ (ЗАЩИЩЕННЫЕ ЭНДПОИНТЫ)
+### ===================================================
+
+### Получить ВСЕ задачи текущего пользователя
+GET {{HostAddress}}/api/todos/
+Authorization: Bearer {{jwt_token}}
+
+### ---------------------------------------------------
+
+### Получить ОДНУ задачу по ID (успешно)
+GET {{HostAddress}}/api/todos/1
+Authorization: Bearer {{jwt_token}}
+
+### ---------------------------------------------------
+
+### Получить задачу с несуществующим ID (ожидаем 404 Not Found)
+GET {{HostAddress}}/api/todos/999
+Authorization: Bearer {{jwt_token}}
+
+### ---------------------------------------------------
+
+### Создать новую задачу
+POST {{HostAddress}}/api/todos/
+Content-Type: application/json
+Authorization: Bearer {{jwt_token}}
+
+{
+  "name": "Написать тесты для API",
   "isComplete": false
 }
 
-### Создать новую задачу (ошибка)
-POST {{TodoApi_HostAddress}}/
+### ---------------------------------------------------
+
+### Обновить задачу по ID
+PUT {{HostAddress}}/api/todos/7
 Content-Type: application/json
+Authorization: Bearer {{jwt_token}}
 
 {
-  "name": "",
-  "isComplete": false
-}
-
-######################
-### PUT запросы
-######################
-
-### Обновить задачу с ID = 1 (успешно)
-PUT {{TodoApi_HostAddress}}/1
-Content-Type: application/json
-
-{
-  "name": "Купить свежий хлеб и молоко",
+  "name": "Написать хорошие тесты для API",
   "isComplete": true
 }
 
-### Обновить задачу с ID = 6 (ошибка)
-PUT {{TodoApi_HostAddress}}/6
-Content-Type: application/json
+### ---------------------------------------------------
 
-{
-  "name": "",
-  "isComplete": true
-}
+### Удалить задачу по ID
+DELETE {{HostAddress}}/api/todos/7
+Authorization: Bearer {{jwt_token}}
 
-######################
-### DELETE запросы
-######################
 
-### Удалить задачу с ID = 2 (успешно)
-DELETE {{TodoApi_HostAddress}}/2
+
+### ===================================================
+###      ТЕСТИРОВАНИЕ ОШИБОК
+### ===================================================
+
+### Попытка получить задачи без токена (ожидаем 401 Unauthorized)
+GET {{HostAddress}}/api/todos/
+
+### ---------------------------------------------------
+
+### Попытка получить задачи с неверным токеном (ожидаем 401 Unauthorized)
+GET {{HostAddress}}/api/todos/
+Authorization: Bearer dfg.dfg.123
+

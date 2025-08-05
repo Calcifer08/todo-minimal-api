@@ -1,4 +1,7 @@
+using System.Security.Claims;
+using System.Threading.Tasks;
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
 using TodoApi.DTOs;
 using TodoApi.Models;
@@ -9,46 +12,68 @@ public class TodoService
 {
   private readonly TodoDbContext _dbContext;
   private readonly IMapper _mapper;
+  private readonly IHttpContextAccessor _httpContextAccessor;
 
-  public TodoService(TodoDbContext dbContext, IMapper mapper)
+  public TodoService(TodoDbContext dbContext, IMapper mapper, IHttpContextAccessor httpContextAccessor)
   {
     _dbContext = dbContext;
     _mapper = mapper;
+    _httpContextAccessor = httpContextAccessor;
   }
 
-  public List<Todo> GetAll() => _dbContext.TodoSet.ToList();
-
-  public Todo? Get(int id)
+  private string? GetCurrentUserId()
   {
-    return _dbContext.TodoSet.Find(id);
+    return _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
   }
 
-  public Todo Create(TodoDTO todoDTO)
+  public async Task<List<Todo>> GetAllAsync()
   {
+    var currentUserId = GetCurrentUserId();
+
+    return await _dbContext.TodoSet.Where(t => t.UserId == currentUserId).ToListAsync();
+  }
+
+  public async Task<Todo?> GetAsync(int id)
+  {
+    var currentUserId = GetCurrentUserId();
+    return await _dbContext.TodoSet.FirstOrDefaultAsync(t => t.Id == id && t.UserId == currentUserId);
+  }
+
+  public async Task<Todo> CreateAsync(TodoDTO todoDTO)
+  {
+    var currentUserId = GetCurrentUserId();
+
+    if (string.IsNullOrEmpty(currentUserId))
+    {
+      throw new InvalidOperationException("Не удалось определить пользователя для создания задачи");
+    }
+
+
     var todo = _mapper.Map<Todo>(todoDTO);
-    _dbContext.Add(todo);
-    _dbContext.SaveChanges();
+    todo.UserId = currentUserId;
+    await _dbContext.AddAsync(todo);
+    await _dbContext.SaveChangesAsync();
 
     return todo;
   }
 
-  public void Update(int id, TodoDTO newTodoDTO)
+  public async Task UpdateAsync(int id, TodoDTO newTodoDTO)
   {
-    var oldTodo = _dbContext.TodoSet.Find(id);
+    var oldTodo = await GetAsync(id);
 
     if (oldTodo is null) return;
 
     _mapper.Map(newTodoDTO, oldTodo);
-    _dbContext.SaveChanges();
+    await _dbContext.SaveChangesAsync();
   }
 
-  public void Delete(int id)
+  public async Task DeleteAsync(int id)
   {
-    var todo = Get(id);
+    var todo = await GetAsync(id);
 
     if (todo is null) return;
 
     _dbContext.Remove(todo);
-    _dbContext.SaveChanges();
+    await _dbContext.SaveChangesAsync();
   }
 }

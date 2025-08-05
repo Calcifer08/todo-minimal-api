@@ -7,6 +7,11 @@ using FluentValidation;
 using TodoApi.Validators;
 using TodoApi.Middleware;
 using Microsoft.Net.Http.Headers;
+using TodoApi.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,10 +38,52 @@ builder.Services.AddCors(options =>
             HttpMethods.Delete);
     });
 });
+builder.Services.AddIdentity<ApiUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 8;
+})
+.AddEntityFrameworkStores<TodoDbContext>();
+
+var jwtIssuer = builder.Configuration["JWT:Issuer"];
+var jwtAudience = builder.Configuration["JWT:Audience"];
+var jwtKey = builder.Configuration["JWT:Key"];
+
+if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience) || string.IsNullOrEmpty(jwtKey))
+{
+    throw new InvalidOperationException("Ключевые параметры JWT (Issuer, Audience, Key) не настроены в конфигурации");
+}
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+    };
+});
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
 app.UseCors("Policy");
+app.UseAuthentication();
+app.UseAuthorization();
+
 
 if (app.Environment.IsDevelopment())
 {
@@ -65,16 +112,51 @@ app.MapGet("/error", (HttpContext context) =>
     );
 });
 
-app.MapGet("/", (TodoService todoService) =>
+app.MapGet("/", () => "Hello, World! Welcome to TodoApi.");
+
+
+var authEndpoints = app.MapGroup("/api/auth");
+
+authEndpoints.MapPost("/register", async (RegisterDto registerDTO, UserManager<ApiUser> userManager, TokenService tokenService) =>
 {
-    var todos = todoService.GetAll();
+    var user = new ApiUser() { UserName = registerDTO.Email, Email = registerDTO.Email };
+    var result = await userManager.CreateAsync(user, registerDTO.Password);
+
+    if (!result.Succeeded)
+    {
+        return Results.ValidationProblem(result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
+    }
+
+    var token = tokenService.CreateToken(user);
+    return Results.Ok(new { Token = token });
+});
+
+authEndpoints.MapPost("/login", async (LoginDto loginDto, UserManager<ApiUser> userManager, TokenService tokenService) =>
+{
+    var user = await userManager.FindByEmailAsync(loginDto.Email);
+
+    if (user == null || !await userManager.CheckPasswordAsync(user, loginDto.Password))
+    {
+        return Results.Unauthorized();
+    }
+
+    var token = tokenService.CreateToken(user);
+    return Results.Ok(new { Token = token });
+});
+
+
+var todosEndpoints = app.MapGroup("/api/todos").RequireAuthorization();
+
+todosEndpoints.MapGet("/", async (TodoService todoService) =>
+{
+    var todos = await todoService.GetAllAsync();
     return Results.Ok(todos);
 
 });
 
-app.MapGet("/{id:int}", (int id, TodoService todoService) =>
+todosEndpoints.MapGet("/{id:int}", async (int id, TodoService todoService) =>
 {
-    var todo = todoService.Get(id);
+    var todo = await todoService.GetAsync(id);
 
     if (todo is not null)
         return Results.Ok(todo);
@@ -82,7 +164,7 @@ app.MapGet("/{id:int}", (int id, TodoService todoService) =>
         return Results.NotFound();
 });
 
-app.MapPost("/", (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
+todosEndpoints.MapPost("/", async (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
 {
     var validResult = validator.Validate(todoDTO);
     if (!validResult.IsValid)
@@ -90,38 +172,37 @@ app.MapPost("/", (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> 
         return Results.ValidationProblem(validResult.ToDictionary());
     }
 
-    var todo = todoService.Create(todoDTO);
+    var todo = await todoService.CreateAsync(todoDTO);
     return Results.Created($"/{todo.Id}", todo);
 });
 
-app.MapPut("/{id:int}", (int id, TodoDTO newTodoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
+todosEndpoints.MapPut("/{id:int}", async (int id, TodoDTO newTodoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
 {
+    var todo = await todoService.GetAsync(id);
+    if (todo is null)
+    {
+        return Results.NotFound();
+    }
+
     var validResult = validator.Validate(newTodoDTO);
     if (!validResult.IsValid)
     {
         return Results.ValidationProblem(validResult.ToDictionary());
     }
 
-
-    var todo = todoService.Get(id);
-    if (todo is null)
-    {
-        return Results.NotFound();
-    }
-
-    todoService.Update(id, newTodoDTO);
+    await todoService.UpdateAsync(id, newTodoDTO);
     return Results.NoContent();
 });
 
-app.MapDelete("/{id:int}", (int id, TodoService todoService) =>
+todosEndpoints.MapDelete("/{id:int}", async (int id, TodoService todoService) =>
 {
-    var todo = todoService.Get(id);
+    var todo = await todoService.GetAsync(id);
     if (todo is null)
     {
         return Results.NotFound();
     }
 
-    todoService.Delete(id);
+    await todoService.DeleteAsync(id);
     return Results.NoContent();
 });
 
