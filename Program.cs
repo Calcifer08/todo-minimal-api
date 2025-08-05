@@ -80,11 +80,6 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
-app.UseCors("Policy");
-app.UseAuthentication();
-app.UseAuthorization();
-
-
 if (app.Environment.IsDevelopment())
 {
     app.UseMiddleware<RequestLoggingMiddleware>();
@@ -97,6 +92,16 @@ else
 {
     app.UseExceptionHandler("/error");
 }
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+app.UseCors("Policy");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+
 
 app.MapGet("/error", (HttpContext context) =>
 {
@@ -112,7 +117,7 @@ app.MapGet("/error", (HttpContext context) =>
     );
 });
 
-app.MapGet("/", () => "Hello, World! Welcome to TodoApi.");
+// app.MapGet("/", () => "Hello, World! Welcome to TodoApi.");
 
 
 var authEndpoints = app.MapGroup("/api/auth");
