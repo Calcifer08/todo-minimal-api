@@ -13,3 +13,7 @@ app.MapAuthEndpoints();
 app.MapTodoEndpoints();
 
 app.Run();
+
+
+// для видимости в интеграционных тестах
+public partial class Program { }
