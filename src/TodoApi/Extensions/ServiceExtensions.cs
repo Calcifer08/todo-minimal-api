@@ -11,6 +11,8 @@ using TodoApi.DTOs;
 using FluentValidation;
 using TodoApi.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.OpenApi.Models;
+using TodoApi.Swagger;
 
 namespace TodoApi.Extensions;
 
@@ -27,7 +29,25 @@ public static class ServiceExtensions
         });
         services.AddScoped<IValidator<TodoDTO>, TodoDtoValidator>();
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            // Добавляем заголовок и описание для страницы Swagger
+            options.SwaggerDoc("v1", new OpenApiInfo { Title = "Todo API", Version = "v1" });
+
+            // 1. Определяем схему безопасности Bearer (JWT)
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                In = ParameterLocation.Header,
+                Description = "Пожалуйста, введите JWT токен в это поле (без слова Bearer)",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                Scheme = "bearer" // важно: в нижнем регистре
+            });
+
+            // 2. Добавляем требование безопасности, которое будет применяться ко всем эндпоинтам
+            options.OperationFilter<SecurityRequirementsOperationFilter>();
+        });
         services.AddCors(options =>
         {
             options.AddPolicy("Policy", policy =>
