@@ -11,13 +11,11 @@ namespace TodoApi.Services;
 public class TodoService
 {
   private readonly TodoDbContext _dbContext;
-  private readonly IMapper _mapper;
   private readonly IHttpContextAccessor _httpContextAccessor;
 
-  public TodoService(TodoDbContext dbContext, IMapper mapper, IHttpContextAccessor httpContextAccessor)
+  public TodoService(TodoDbContext dbContext, IHttpContextAccessor httpContextAccessor)
   {
     _dbContext = dbContext;
-    _mapper = mapper;
     _httpContextAccessor = httpContextAccessor;
   }
 
@@ -39,7 +37,7 @@ public class TodoService
     return await _dbContext.TodoSet.FirstOrDefaultAsync(t => t.Id == id && t.UserId == currentUserId);
   }
 
-  public async Task<Todo> CreateAsync(TodoDTO todoDTO)
+  public async Task<Todo> CreateAsync(Todo todo)
   {
     var currentUserId = GetCurrentUserId();
 
@@ -48,8 +46,6 @@ public class TodoService
       throw new InvalidOperationException("Не удалось определить пользователя для создания задачи");
     }
 
-
-    var todo = _mapper.Map<Todo>(todoDTO);
     todo.UserId = currentUserId;
     await _dbContext.AddAsync(todo);
     await _dbContext.SaveChangesAsync();
@@ -57,23 +53,16 @@ public class TodoService
     return todo;
   }
 
-  public async Task UpdateAsync(int id, TodoDTO newTodoDTO)
+  public async Task UpdateAsync(Todo newTodo)
   {
-    var oldTodo = await GetAsync(id);
+    _dbContext.TodoSet.Update(newTodo);
 
-    if (oldTodo is null) return;
-
-    _mapper.Map(newTodoDTO, oldTodo);
     await _dbContext.SaveChangesAsync();
   }
 
-  public async Task DeleteAsync(int id)
+  public async Task DeleteAsync(Todo todoDel)
   {
-    var todo = await GetAsync(id);
-
-    if (todo is null) return;
-
-    _dbContext.Remove(todo);
+    _dbContext.Remove(todoDel);
     await _dbContext.SaveChangesAsync();
   }
 }

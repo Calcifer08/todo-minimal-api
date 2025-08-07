@@ -1,3 +1,4 @@
+using AutoMapper;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using TodoApi.DTOs;
@@ -61,24 +62,27 @@ public static class EndpointExtensions
     {
         var todosEndpoints = app.MapGroup("/api/todos").RequireAuthorization();
 
-        todosEndpoints.MapGet("/", async (TodoService todoService) =>
+        todosEndpoints.MapGet("/", async (TodoService todoService, IMapper mapper) =>
         {
             var todos = await todoService.GetAllAsync();
-            return Results.Ok(todos);
+            var todosViewDTO = mapper.Map<List<TodoViewDto>>(todos);
+            return Results.Ok(todosViewDTO);
 
         });
 
-        todosEndpoints.MapGet("/{id:int}", async (int id, TodoService todoService) =>
+        todosEndpoints.MapGet("/{id:int}", async (int id, TodoService todoService, IMapper mapper) =>
         {
             var todo = await todoService.GetAsync(id);
 
-            if (todo is not null)
-                return Results.Ok(todo);
-            else
+            if (todo is null)
                 return Results.NotFound();
+
+            var todoViewDto = mapper.Map<TodoViewDto>(todo);
+            return Results.Ok(todoViewDto);
         });
 
-        todosEndpoints.MapPost("/", async (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
+        todosEndpoints.MapPost("/", async (TodoDTO todoDTO, TodoService todoService, IValidator<TodoDTO> validator,
+            IMapper mapper) =>
         {
             var validResult = validator.Validate(todoDTO);
             if (!validResult.IsValid)
@@ -86,14 +90,18 @@ public static class EndpointExtensions
                 return Results.ValidationProblem(validResult.ToDictionary());
             }
 
-            var todo = await todoService.CreateAsync(todoDTO);
-            return Results.Created($"/{todo.Id}", todo);
+            var newTodo = mapper.Map<Todo>(todoDTO);
+
+            var createdTodo = await todoService.CreateAsync(newTodo);
+            var todoViewDto = mapper.Map<TodoViewDto>(createdTodo);
+            return Results.Created($"/{todoViewDto.Id}", todoViewDto);
         });
 
-        todosEndpoints.MapPut("/{id:int}", async (int id, TodoDTO newTodoDTO, TodoService todoService, IValidator<TodoDTO> validator) =>
+        todosEndpoints.MapPut("/{id:int}", async (int id, TodoDTO newTodoDTO, TodoService todoService,
+            IValidator<TodoDTO> validator, IMapper mapper) =>
         {
-            var todo = await todoService.GetAsync(id);
-            if (todo is null)
+            var todoToUpdate = await todoService.GetAsync(id);
+            if (todoToUpdate is null)
             {
                 return Results.NotFound();
             }
@@ -104,19 +112,21 @@ public static class EndpointExtensions
                 return Results.ValidationProblem(validResult.ToDictionary());
             }
 
-            await todoService.UpdateAsync(id, newTodoDTO);
+            mapper.Map(newTodoDTO, todoToUpdate);
+
+            await todoService.UpdateAsync(todoToUpdate);
             return Results.NoContent();
         });
 
-        todosEndpoints.MapDelete("/{id:int}", async (int id, TodoService todoService) =>
+        todosEndpoints.MapDelete("/{id:int}", async (int id, TodoService todoService, IMapper mapper) =>
         {
-            var todo = await todoService.GetAsync(id);
-            if (todo is null)
+            var todoToDelete = await todoService.GetAsync(id);
+            if (todoToDelete is null)
             {
                 return Results.NotFound();
             }
 
-            await todoService.DeleteAsync(id);
+            await todoService.DeleteAsync(todoToDelete);
             return Results.NoContent();
         });
     }

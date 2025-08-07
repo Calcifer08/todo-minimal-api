@@ -9,5 +9,7 @@ public class TodoProfile : Profile
     public TodoProfile()
     {
         CreateMap<TodoDTO, Todo>().ReverseMap();
+
+        CreateMap<Todo, TodoViewDto>();
     }
 }
