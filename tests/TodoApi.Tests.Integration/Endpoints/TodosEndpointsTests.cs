@@ -49,13 +49,19 @@ public class TodosEndpointsTests : IClassFixture<TodoApiFactory>
         var (user1Id, user1Token) = await CreateUserAndGetTokenAsync($"user1_{Guid.NewGuid()}@test.com");
         var (user2Id, _) = await CreateUserAndGetTokenAsync($"user2_{Guid.NewGuid()}@test.com");
 
+        List<int> user1TodoIdsInDb;
         using (var scope = _factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
-            dbContext.TodoSet.Add(new Todo { Name = "User 1 Task", UserId = user1Id });
-            dbContext.TodoSet.Add(new Todo { Name = "Another User 1 Task", UserId = user1Id });
-            dbContext.TodoSet.Add(new Todo { Name = "User 2 Task", UserId = user2Id });
+            var user1Task1 = new Todo { Name = "Задача пользователя 1", UserId = user1Id };
+            var user1Task2 = new Todo { Name = "Задача другого пользователя 1", UserId = user1Id };
+
+            dbContext.TodoSet.Add(user1Task1);
+            dbContext.TodoSet.Add(user1Task2);
+            dbContext.TodoSet.Add(new Todo { Name = "Задача пользователя 2", UserId = user2Id });
             await dbContext.SaveChangesAsync();
+
+            user1TodoIdsInDb = new List<int> { user1Task1.Id, user1Task2.Id };
         }
 
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", user1Token);
@@ -65,9 +71,13 @@ public class TodosEndpointsTests : IClassFixture<TodoApiFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user1Todos = await response.Content.ReadFromJsonAsync<List<Todo>>();
-        user1Todos.Should().HaveCount(2);
-        user1Todos.Should().OnlyContain(t => t.UserId == user1Id);
+
+        var returnedTodos = await response.Content.ReadFromJsonAsync<List<TodoViewDto>>();
+
+        returnedTodos.Should().HaveCount(2);
+
+        var returnedIds = returnedTodos.Select(t => t.Id);
+        returnedIds.Should().BeEquivalentTo(user1TodoIdsInDb);
     }
 
     [Fact]
@@ -86,22 +96,26 @@ public class TodosEndpointsTests : IClassFixture<TodoApiFactory>
         // Arrange
         var (userId, token) = await CreateUserAndGetTokenAsync($"user1_{Guid.NewGuid()}@test.com");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var newTodoDto = new TodoDTO { Name = "My new integration task" };
+
+        var newTodoDto = new TodoDTO { Name = "Новая задача" };
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/todos", newTodoDto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var createdTodo = await response.Content.ReadFromJsonAsync<Todo>();
-        createdTodo!.UserId.Should().Be(userId);
-        createdTodo.Name.Should().Be(newTodoDto.Name);
+        var createdTodoDto = await response.Content.ReadFromJsonAsync<TodoViewDto>();
+        createdTodoDto.Should().NotBeNull();
+        createdTodoDto.Name.Should().Be(newTodoDto.Name);
 
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
-        var todoInDb = await dbContext.TodoSet.FindAsync(createdTodo.Id);
+
+        var todoInDb = await dbContext.TodoSet.FindAsync(createdTodoDto.Id);
+
         todoInDb.Should().NotBeNull();
         todoInDb.UserId.Should().Be(userId);
+        todoInDb.Name.Should().Be(newTodoDto.Name);
     }
 
 

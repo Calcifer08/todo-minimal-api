@@ -13,7 +13,6 @@ namespace TodoApi.Tests.Unit;
 public class TodoServiceTests
 {
   private readonly TodoDbContext _dbContext;
-  private readonly Mock<IMapper> _mapperMock;
   private readonly Mock<IHttpContextAccessor> _httpContextAccessorMock;
   private readonly TodoService _sut;
 
@@ -24,10 +23,9 @@ public class TodoServiceTests
         .Options;
     _dbContext = new TodoDbContext(options);
 
-    _mapperMock = new Mock<IMapper>();
     _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
 
-    _sut = new TodoService(_dbContext, _mapperMock.Object, _httpContextAccessorMock.Object);
+    _sut = new TodoService(_dbContext, _httpContextAccessorMock.Object);
   }
 
   private void SeedDatabase()
@@ -111,10 +109,7 @@ public class TodoServiceTests
     var currentUserId = "user-1";
     SetupHttpContextForUser(currentUserId);
 
-    var newTodo = new TodoDTO() { Name = "Новая задача user-1", IsComplete = false };
-
-    _mapperMock.Setup(m => m.Map<Todo>(It.IsAny<TodoDTO>()))
-               .Returns((TodoDTO dto) => new Todo { Name = dto.Name, IsComplete = dto.IsComplete });
+    var newTodo = new Todo() { Name = "Новая задача user-1", IsComplete = false };
 
     var initialCountTodo = _dbContext.TodoSet.Count();
 
@@ -133,12 +128,7 @@ public class TodoServiceTests
   public async Task Create_TodoAuthorizedNotUser()
   {
     // Arrange
-    var newTodo = new TodoDTO() { Name = "Новая задача", IsComplete = false };
-
-    _mapperMock.Setup(m => m.Map<Todo>(It.IsAny<TodoDTO>()))
-               .Returns((TodoDTO dto) => new Todo { Name = dto.Name, IsComplete = dto.IsComplete });
-
-    var initialCountTodo = _dbContext.TodoSet.Count();
+    var newTodo = new Todo() { Name = "Новая задача", IsComplete = false };
 
     // Act & Assert
     await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.CreateAsync(newTodo));
@@ -149,81 +139,21 @@ public class TodoServiceTests
   {
     // Arrange
     SeedDatabase();
-    var currentUserId = "user-1";
-    var todoId = 1;
-    SetupHttpContextForUser(currentUserId);
 
-    var updateTodo = new TodoDTO() { Name = "Задача 1 от user-1 - выполнена", IsComplete = true };
+    var todoToUpdate = await _dbContext.TodoSet.FindAsync(1);
+    Assert.NotNull(todoToUpdate);
 
-    _mapperMock.Setup(m => m.Map(It.IsAny<TodoDTO>(), It.IsAny<Todo>()))
-               .Callback((TodoDTO dto, Todo todo) =>
-               {
-                 todo.Name = dto.Name;
-                 todo.IsComplete = dto.IsComplete;
-               });
+    var originalName = todoToUpdate.Name;
+    var newName = "Обновленная задачв";
+    todoToUpdate.Name = newName;
 
     // Act
-    await _sut.UpdateAsync(todoId, updateTodo);
+    await _sut.UpdateAsync(todoToUpdate);
 
     // Assert
-    var result = await _dbContext.TodoSet.FindAsync(todoId);
-    Assert.NotNull(result);
-    Assert.Equal(updateTodo.Name, result.Name);
-    Assert.Equal(updateTodo.IsComplete, result.IsComplete);
-  }
-
-  [Fact]
-  public async Task Update_ExistingTodoOwnedNotUser()
-  {
-    // Arrange
-    SeedDatabase();
-    var currentUserId = "user-1";
-    var todoId = 3;
-    SetupHttpContextForUser(currentUserId);
-
-    var updateTodo = new TodoDTO() { Name = "Задача 3 от user-3 - выполнена", IsComplete = true };
-
-    _mapperMock.Setup(m => m.Map(It.IsAny<TodoDTO>(), It.IsAny<Todo>()))
-               .Callback((TodoDTO dto, Todo todo) =>
-               {
-                 todo.Name = dto.Name;
-                 todo.IsComplete = dto.IsComplete;
-               });
-
-    // Act
-    await _sut.UpdateAsync(todoId, updateTodo);
-
-    // Assert
-    var result = await _dbContext.TodoSet.FindAsync(todoId);
-    Assert.NotNull(result);
-    Assert.NotEqual(updateTodo.Name, result.Name);
-    Assert.NotEqual(updateTodo.IsComplete, result.IsComplete);
-  }
-
-  [Fact]
-  public async Task Update_NotExistingTodo()
-  {
-    // Arrange
-    SeedDatabase();
-    var currentUserId = "user-1";
-    var todoId = 999;
-    SetupHttpContextForUser(currentUserId);
-
-    var updateTodo = new TodoDTO() { Name = "Задача 999 от user-1 - выполнена", IsComplete = true };
-
-    _mapperMock.Setup(m => m.Map(It.IsAny<TodoDTO>(), It.IsAny<Todo>()))
-               .Callback((TodoDTO dto, Todo todo) =>
-               {
-                 todo.Name = dto.Name;
-                 todo.IsComplete = dto.IsComplete;
-               });
-
-    // Act
-    await _sut.UpdateAsync(todoId, updateTodo);
-
-    // Assert
-    var result = await _dbContext.TodoSet.FindAsync(todoId);
-    Assert.Null(result);
+    var todoFromDb = await _dbContext.TodoSet.AsNoTracking().FirstOrDefaultAsync(t => t.Id == 1);
+    Assert.NotNull(todoFromDb);
+    Assert.Equal(newName, todoFromDb.Name);
   }
 
   [Fact]
@@ -231,40 +161,16 @@ public class TodoServiceTests
   {
     // Arrange
     SeedDatabase();
-    var currentUserId = "user-1";
-    var todoId = 1;
-    SetupHttpContextForUser(currentUserId);
-
-    var initialCountTodo = _dbContext.TodoSet.Count();
+    var initialCountTodo = await _dbContext.TodoSet.CountAsync();
+    var todoToDelete = await _dbContext.TodoSet.FindAsync(1);
+    Assert.NotNull(todoToDelete);
 
     // Act
-    await _sut.DeleteAsync(todoId);
+    await _sut.DeleteAsync(todoToDelete!);
 
     // Assert
     Assert.Equal(initialCountTodo - 1, _dbContext.TodoSet.Count());
-
-    var result = await _dbContext.TodoSet.FindAsync(todoId);
+    var result = await _dbContext.TodoSet.FindAsync(1);
     Assert.Null(result);
-  }
-
-  [Fact]
-  public async Task Delete_ExistingTodoOwnedNotUser()
-  {
-    // Arrange
-    SeedDatabase();
-    var currentUserId = "user-1";
-    var todoId = 3;
-    SetupHttpContextForUser(currentUserId);
-
-    var initialCountTodo = _dbContext.TodoSet.Count();
-
-    // Act
-    await _sut.DeleteAsync(todoId);
-
-    // Assert
-    Assert.Equal(initialCountTodo, _dbContext.TodoSet.Count());
-
-    var result = await _dbContext.TodoSet.FindAsync(todoId);
-    Assert.NotNull(result);
   }
 }

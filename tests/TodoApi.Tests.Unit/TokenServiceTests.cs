@@ -29,7 +29,7 @@ public class TokenServiceTests
     }
 
     [Fact]
-    public void CreateToken_WhenCalledWithUser_ReturnsValidJwtToken()
+    public void CreateToken_ReturnsValidJwtToken()
     {
         // Arrange
         var user = new ApiUser()
